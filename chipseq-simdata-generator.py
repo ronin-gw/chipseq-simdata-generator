@@ -67,12 +67,10 @@ class Chromosome:
 
     def get_reads_from_peaks(self, width, readlen, n):
         peaks = tuple(self.peak_regions)
-        if not peaks:
-            raise StopIteration
-
-        for _ in range(n):
-            peak = random.choice(peaks)
-            yield self._get_read_from_fragment(peak, width, readlen)
+        if peaks:
+            for _ in range(n):
+                peak = random.choice(peaks)
+                yield self._get_read_from_fragment(peak, width, readlen)
 
     def get_reads_as_background(self, width, readlen, n):
         for _ in range(n):
@@ -97,10 +95,10 @@ class Formatter:
     @staticmethod
     def revcom(func):
         @functools.wraps(func)
-        def _revcomp(seq, is_pos_strand, *args, **kwargs):
+        def _revcomp(self, chrname, pos, is_pos_strand, seq, is_peak):
             if not is_pos_strand:
                 seq = seq.translate(Formatter.COMPLEMENT)[::-1]
-            return func(seq, is_pos_strand, *args, **kwargs)
+            return func(self, chrname, pos, is_pos_strand, seq, is_peak)
         return _revcomp
 
 
@@ -108,7 +106,7 @@ class FASTQFormatter(Formatter):
     @Formatter.revcom
     def format(self, chrname, pos, is_pos_strand, seq, is_peak):
         print('@' + self._make_seq_name(chrname, pos, is_pos_strand, is_peak),
-              seq, '+' if is_pos_strand else '-', 'I' * len(seq), sep='\n')
+              seq, '+', 'I' * len(seq), sep='\n')
 
 
 class SAMFormatter(Formatter):
@@ -120,7 +118,6 @@ class SAMFormatter(Formatter):
             print("@SQ", "SN:" + n, "LN:{}".format(l), sep='\t')
         print("@PG", "ID:Python{0}.{1}.{2}".format(*sys.version_info), "PN:" + __name__, "CL:" + ' '.join(sys.argv))
 
-    @Formatter.revcom
     def format(self, chrname, pos, is_pos_strand, seq, is_peak):
         print(
             self._make_seq_name(chrname, pos, is_pos_strand, is_peak),
