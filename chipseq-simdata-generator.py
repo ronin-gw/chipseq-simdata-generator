@@ -56,7 +56,7 @@ class Chromosome:
                 self.peak_regions.add(peak)
 
     def _get_read_from_fragment(self, frag, width, readlen):
-        positive_strand = bool(random.getrandbits(1))
+        positive_strand = random.random() >= 0.5
         if positive_strand:
             pos = random.randrange(frag.begin, frag.begin + width)
         else:
@@ -84,28 +84,31 @@ class Formatter:
     COMPLEMENT = str.maketrans("ATGC", "TACG")
 
     @staticmethod
-    def _make_seq_name(chrname, pos, is_pos_strand, is_peak):
+    def _make_seq_name(chrname, pos, is_pos_strand, is_yield_from_peak):
         return "{}_{}_{}_{}".format(
             chrname,
             pos,
             '+' if is_pos_strand else '-',
-            "peak" if is_peak else "background"
+            "peak" if is_yield_from_peak else "background"
         )
 
     @staticmethod
     def revcom(func):
         @functools.wraps(func)
-        def _revcomp(self, chrname, pos, is_pos_strand, seq, is_peak):
+        def _revcomp(self, chrname, pos, is_pos_strand, seq, is_yield_from_peak):
             if not is_pos_strand:
                 seq = seq.translate(Formatter.COMPLEMENT)[::-1]
-            return func(self, chrname, pos, is_pos_strand, seq, is_peak)
+            return func(self, chrname, pos, is_pos_strand, seq, is_yield_from_peak)
         return _revcomp
+
+    def format(self, *args, **kwargs):
+        raise NotImplementedError
 
 
 class FASTQFormatter(Formatter):
     @Formatter.revcom
-    def format(self, chrname, pos, is_pos_strand, seq, is_peak):
-        print('@' + self._make_seq_name(chrname, pos, is_pos_strand, is_peak),
+    def format(self, chrname, pos, is_pos_strand, seq, is_yield_from_peak):
+        print('@' + self._make_seq_name(chrname, pos, is_pos_strand, is_yield_from_peak),
               seq, '+', 'I' * len(seq), sep='\n')
 
 
@@ -118,9 +121,9 @@ class SAMFormatter(Formatter):
             print("@SQ", "SN:" + n, "LN:{}".format(l), sep='\t')
         print("@PG", "ID:Python{0}.{1}.{2}".format(*sys.version_info), "PN:" + __name__, "CL:" + ' '.join(sys.argv))
 
-    def format(self, chrname, pos, is_pos_strand, seq, is_peak):
+    def format(self, chrname, pos, is_pos_strand, seq, is_yield_from_peak):
         print(
-            self._make_seq_name(chrname, pos, is_pos_strand, is_peak),
+            self._make_seq_name(chrname, pos, is_pos_strand, is_yield_from_peak),
             0 if is_pos_strand else 16,
             chrname,
             pos + 1,
